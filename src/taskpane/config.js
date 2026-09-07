@@ -98,6 +98,22 @@ const CONFIG = {
         plain: "#f8f8f2",
       },
     },
+    "a11y-dark": {
+      label: "A11y Dark",
+      card: { backgroundColor: "#2b2b2b", borderColor: "#444444" },
+      title: { backgroundColor: "#363636", textColor: "#f8f8f2" },
+      colors: {
+        comment: "#d4d0ab", prolog: "#d4d0ab", doctype: "#d4d0ab", cdata: "#d4d0ab",
+        punctuation: "#f8f8f2", operator: "#f8f8f2",
+        property: "#abe338", tag: "#dcc6e0", boolean: "#ffa07a", number: "#dcc6e0",
+        constant: "#00e0e0", symbol: "#dcc6e0", deleted: "#ffd700",
+        selector: "#ffd700", "attr-name": "#abe338", string: "#ffd700", char: "#ffd700",
+        builtin: "#ffd700", inserted: "#dcc6e0", variable: "#00e0e0", "attr-value": "#ffd700",
+        keyword: "#ffa07a", regex: "#ffa07a", important: "#ffa07a",
+        function: "#ffd700", "class-name": "#ffd700", package: "#ffd700", delimiter: "#d4d0ab",
+        plain: "#f8f8f2",
+      },
+    },
     "github-light": {
       label: "GitHub Light",
       card: { backgroundColor: "#f6f8fa", borderColor: "#d0d7de" },
