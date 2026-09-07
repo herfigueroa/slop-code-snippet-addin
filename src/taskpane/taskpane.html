@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Snippets de Código</title>
+
+  <!-- Office.js: requiere conexión a internet siempre (no se vendoriza; ver README) -->
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+
+  <!--
+    Prism.js: motor de resaltado de sintaxis, vendorizado localmente en
+    vendor/prism/ para que el add-in funcione sin conexión a internet (salvo
+    Office.js, que siempre requiere red). Ver README.md → "Uso sin conexión"
+    para la lista de lenguajes incluidos y cómo agregar más.
+  -->
+  <script src="vendor/prism/prism-core-bundle.min.js"></script>
+  <script src="vendor/prism/prism-markup-templating.min.js"></script>
+  <script src="vendor/prism/prism-php.min.js"></script>
+  <script src="vendor/prism/prism-python.min.js"></script>
+  <script src="vendor/prism/prism-typescript.min.js"></script>
+  <script src="vendor/prism/prism-json.min.js"></script>
+  <script src="vendor/prism/prism-bash.min.js"></script>
+  <script src="vendor/prism/prism-csharp.min.js"></script>
+  <script src="vendor/prism/prism-c.min.js"></script>
+  <script src="vendor/prism/prism-java.min.js"></script>
+  <script src="vendor/prism/prism-pseint.js"></script>
+
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <div id="app">
+    <header class="app-header">
+      <h1>Insertar snippet de código</h1>
+      <p id="hostLabel" class="host-label">Detectando aplicación…</p>
+    </header>
+
+    <main>
+      <!-- Código -->
+      <section class="field-group">
+        <label for="codeInput">Código</label>
+        <textarea id="codeInput" spellcheck="false" placeholder="Pega o escribe tu código aquí…"></textarea>
+      </section>
+
+      <!-- Lenguaje y tamaño de fuente -->
+      <section class="field-row">
+        <div class="field-group">
+          <label for="languageSelect">Lenguaje</label>
+          <select id="languageSelect"></select>
+        </div>
+        <div class="field-group small">
+          <label for="fontSizeInput">Tamaño (pt)</label>
+          <input type="number" id="fontSizeInput" min="8" max="36" step="1" />
+        </div>
+      </section>
+
+      <!-- Fuente y esquema de color -->
+      <section class="field-row">
+        <div class="field-group">
+          <label for="fontFamilySelect">Fuente</label>
+          <select id="fontFamilySelect"></select>
+          <input type="text" id="customFontInput" placeholder="Ej: 'Roboto Mono', monospace" hidden />
+        </div>
+        <div class="field-group">
+          <label for="themeSelect">Esquema de color</label>
+          <select id="themeSelect"></select>
+        </div>
+      </section>
+
+      <!-- Título opcional -->
+      <section class="field-group toggle-group">
+        <label class="switch-label">
+          <input type="checkbox" id="showTitleToggle" />
+          <span>Mostrar título del snippet</span>
+        </label>
+        <input type="text" id="titleInput" placeholder="Ej: server.js" disabled />
+      </section>
+
+      <!-- Fondo (solo aplica visualmente distinto en Word, según lo solicitado) -->
+      <section class="field-group toggle-group" id="backgroundSection">
+        <label class="switch-label">
+          <input type="checkbox" id="showBackgroundToggle" />
+          <span>Agregar fondo / tarjeta al snippet</span>
+        </label>
+        <p class="hint" id="backgroundHint">
+          Al insertarlo en Word, envuelve el código en una tabla con fondo oscuro y bordes.
+        </p>
+      </section>
+
+      <!-- Vista previa -->
+      <section class="field-group">
+        <label>Vista previa</label>
+        <div id="previewWrapper">
+          <div id="previewTitle" class="preview-title" hidden></div>
+          <pre id="previewCode" class="preview-code"><code id="previewCodeInner"></code></pre>
+        </div>
+      </section>
+
+      <p class="hint">
+        Para <strong>editar</strong> un snippet ya insertado: selecciónalo en el documento
+        (la tabla en Word, o la imagen en PowerPoint), ajusta el código arriba y vuelve a
+        pulsar <em>Insertar</em>: reemplazará automáticamente la selección.
+      </p>
+
+      <button id="insertButton" class="primary-button">Insertar en el documento</button>
+      <div id="statusMessage" class="status-message" role="status"></div>
+    </main>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="highlighter.js"></script>
+  <script src="renderer.js"></script>
+  <script src="taskpane.js"></script>
+</body>
+</html>

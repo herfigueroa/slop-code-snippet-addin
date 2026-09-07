@@ -1,0 +1,11 @@
+{
+  "name": "code-snippet-addin",
+  "version": "1.0.0",
+  "description": "Office Add-in (Word + PowerPoint) para insertar snippets de código con resaltado de sintaxis",
+  "scripts": {
+    "cert": "npx --yes office-addin-dev-certs install",
+    "start": "npx --yes http-server . -p 3000 -S -C \"$HOME/.office-addin-dev-certs/localhost.crt\" -K \"$HOME/.office-addin-dev-certs/localhost.key\"",
+    "validate": "npx --yes office-addin-manifest validate manifest.xml"
+  },
+  "license": "MIT"
+}
