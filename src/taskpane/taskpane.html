@@ -61,10 +61,25 @@
           <label for="fontFamilySelect">Fuente</label>
           <select id="fontFamilySelect"></select>
           <input type="text" id="customFontInput" placeholder="Ej: 'Roboto Mono', monospace" hidden />
+          <p id="fontAvailabilityHint" class="hint hint-warning" hidden></p>
         </div>
         <div class="field-group">
           <label for="themeSelect">Esquema de color</label>
           <select id="themeSelect"></select>
+        </div>
+      </section>
+
+      <!-- Ancho de la imagen renderizada (PowerPoint siempre; Word si se activa "insertar como imagen") -->
+      <section class="field-row">
+        <div class="field-group small">
+          <label for="imageWidthInput">Ancho imagen (px)</label>
+          <input type="number" id="imageWidthInput" min="320" max="2400" step="10" />
+        </div>
+        <div class="field-group toggle-group" id="insertAsImageSection" hidden>
+          <label class="switch-label">
+            <input type="checkbox" id="insertAsImageToggle" />
+            <span>Insertar como imagen (no como texto editable)</span>
+          </label>
         </div>
       </section>
 
@@ -98,9 +113,11 @@
       </section>
 
       <p class="hint">
-        Para <strong>editar</strong> un snippet ya insertado: selecciónalo en el documento
-        (la tabla en Word, o la imagen en PowerPoint), ajusta el código arriba y vuelve a
-        pulsar <em>Insertar</em>: reemplazará automáticamente la selección.
+        Para <strong>editar</strong> un snippet ya insertado: seleccionalo en el documento
+        (la tabla, o la imagen), ajustá el código arriba y volvé a pulsar <em>Insertar</em>.
+        En Word modo texto y en PowerPoint reemplaza automáticamente lo seleccionado
+        (en PowerPoint, solo si esa imagen fue insertada por este add-in). En Word modo
+        imagen, la nueva imagen se agrega sin borrar la anterior.
       </p>
 
       <button id="insertButton" class="primary-button">Insertar en el documento</button>

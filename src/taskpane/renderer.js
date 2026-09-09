@@ -86,6 +86,8 @@ const Renderer = (() => {
    *  - showBackground: en PowerPoint el fondo/tarjeta SIEMPRE ayuda a la
    *    legibilidad sobre la diapositiva, pero respetamos la preferencia del
    *    usuario igualmente.
+   *  - imageWidth: ancho (px) FIJO de la imagen resultante (no un máximo).
+   *    Si el código no entra, se ajusta línea por línea (ver wrapLines).
    */
   function renderPptImage(options) {
     const { code, lang, title, showBackground, fontSize, fontFamily, themeId } = options;
@@ -93,29 +95,29 @@ const Renderer = (() => {
     const theme = cfg.themes[themeId] || cfg.themes[cfg.defaultThemeId];
     const colors = window.Highlighter.resolveColors(themeId, lang);
     const scale = cfg.canvasScale || 2;
-    const lines = window.Highlighter.highlightToLines(code, lang);
+    const rawLines = window.Highlighter.highlightToLines(code, lang);
 
     const padding = cfg.card.padding;
     const lineHeightPx = Math.round(fontSize * cfg.lineHeight * (96 / 72)); // pt -> px approx
     const fontPx = Math.round(fontSize * (96 / 72));
     const titleHeightPx = title && title.trim().length > 0 ? Math.round(cfg.title.fontSize * (96 / 72) * 2.4) : 0;
 
-    // Canvas temporal solo para medir anchos de texto.
+    // El ancho es el que eligió el usuario (o el default de CONFIG), con un
+    // límite de seguridad por si algo pasa un valor fuera de rango.
+    const contentWidth = Math.min(cfg.imageWidth.max, Math.max(cfg.imageWidth.min, options.imageWidth || cfg.imageWidth.default));
+
+    // Canvas temporal solo para medir el ancho de un caracter (asumimos
+    // fuente monoespaciada, así que todos los caracteres miden lo mismo).
+    // Con eso calculamos cuántos caracteres entran por línea al ancho
+    // elegido, y ajustamos (wrap) las líneas que no entren.
     const measureCanvas = document.createElement("canvas");
     const measureCtx = measureCanvas.getContext("2d");
     measureCtx.font = `${fontPx}px ${fontFamily}`;
+    const charWidth = measureCtx.measureText("M").width || fontPx * 0.6;
+    const availableTextWidth = contentWidth - padding * 2;
+    const maxCharsPerLine = Math.max(10, Math.floor(availableTextWidth / charWidth));
 
-    let maxLineWidth = 0;
-    lines.forEach((line) => {
-      const width = line.reduce((acc, seg) => acc + measureCtx.measureText(seg.text).width, 0);
-      if (width > maxLineWidth) maxLineWidth = width;
-    });
-    if (title) {
-      measureCtx.font = `${Math.round(cfg.title.fontSize * (96 / 72))}px ${fontFamily}`;
-      maxLineWidth = Math.max(maxLineWidth, measureCtx.measureText(title).width);
-    }
-
-    const contentWidth = Math.min(maxLineWidth + padding * 2, cfg.maxCanvasWidth);
+    const lines = wrapLines(rawLines, maxCharsPerLine);
     const contentHeight = titleHeightPx + lines.length * lineHeightPx + padding * 2;
 
     const canvas = document.createElement("canvas");
@@ -168,6 +170,48 @@ const Renderer = (() => {
     });
 
     return canvas.toDataURL("image/png");
+  }
+
+  /**
+   * Divide cada línea lógica del código en una o más líneas físicas para que
+   * ninguna supere `maxCharsPerLine` caracteres, preservando el color
+   * (className) de cada tramo aunque quede partido a la mitad por el ajuste.
+   * Asume fuente monoespaciada (todos los caracteres del mismo ancho), que
+   * es un requisito del resto del add-in de todos modos.
+   */
+  function wrapLines(lines, maxCharsPerLine) {
+    const wrapped = [];
+    lines.forEach((segments) => {
+      if (segments.length === 0) {
+        wrapped.push([]);
+        return;
+      }
+      let current = [];
+      let currentLen = 0;
+      segments.forEach((seg) => {
+        let text = seg.text;
+        while (text.length > 0) {
+          const remaining = maxCharsPerLine - currentLen;
+          if (remaining <= 0) {
+            wrapped.push(current);
+            current = [];
+            currentLen = 0;
+            continue;
+          }
+          const chunk = text.slice(0, remaining);
+          current.push({ text: chunk, className: seg.className });
+          currentLen += chunk.length;
+          text = text.slice(chunk.length);
+          if (text.length > 0) {
+            wrapped.push(current);
+            current = [];
+            currentLen = 0;
+          }
+        }
+      });
+      wrapped.push(current);
+    });
+    return wrapped;
   }
 
   function roundRect(ctx, x, y, width, height, radius) {

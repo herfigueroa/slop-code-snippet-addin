@@ -168,9 +168,17 @@ const CONFIG = {
     fontSize: 12, // pt
   },
 
-  // Ancho máximo del canvas generado para PowerPoint (evita imágenes gigantes
-  // si el código tiene líneas extremadamente largas).
-  maxCanvasWidth: 1600,
+  // Ancho (px) de la imagen renderizada del snippet (usado por PowerPoint
+  // siempre, y por Word cuando se activa "Insertar como imagen"). El
+  // usuario lo puede ajustar desde el panel; "default" es el valor inicial
+  // y "min"/"max" limitan el campo numérico. Si el código no entra en este
+  // ancho, se ajusta línea por línea (word-wrap) asumiendo fuente
+  // monoespaciada.
+  imageWidth: {
+    default: 920,
+    min: 320,
+    max: 2400,
+  },
 
   // Escala de renderizado del canvas (2 = imagen a doble resolución para que
   // se vea nítida al escalarla dentro de la diapositiva).

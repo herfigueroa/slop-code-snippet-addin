@@ -40,7 +40,11 @@ function initDom() {
   els.fontSizeInput = document.getElementById("fontSizeInput");
   els.fontFamilySelect = document.getElementById("fontFamilySelect");
   els.customFontInput = document.getElementById("customFontInput");
+  els.fontAvailabilityHint = document.getElementById("fontAvailabilityHint");
   els.themeSelect = document.getElementById("themeSelect");
+  els.imageWidthInput = document.getElementById("imageWidthInput");
+  els.insertAsImageSection = document.getElementById("insertAsImageSection");
+  els.insertAsImageToggle = document.getElementById("insertAsImageToggle");
   els.showTitleToggle = document.getElementById("showTitleToggle");
   els.titleInput = document.getElementById("titleInput");
   els.backgroundSection = document.getElementById("backgroundSection");
@@ -90,24 +94,60 @@ function restoreDefaults() {
   els.fontFamilySelect.value = window.CONFIG.defaultFontId;
   els.customFontInput.hidden = window.CONFIG.defaultFontId !== "custom";
   els.themeSelect.value = window.CONFIG.defaultThemeId;
+  els.imageWidthInput.value = window.CONFIG.imageWidth.default;
   els.showTitleToggle.checked = false; // desactivado por defecto, según lo solicitado
   els.titleInput.disabled = true;
   els.showBackgroundToggle.checked = false; // desactivado por defecto
+  els.insertAsImageToggle.checked = false; // Word inserta texto editable por defecto
   els.codeInput.value = "";
 }
 
 /**
  * Devuelve el valor CSS font-family final, resolviendo la fuente
- * "Personalizada…" a partir de lo escrito en #customFontInput.
+ * "Personalizada…" a partir de lo escrito en #customFontInput. Los nombres
+ * con espacios (ej. "Fira Sans") se citan entre comillas: la propiedad CSS
+ * font-family los tolera sin comillas, pero el string `ctx.font` de canvas
+ * es más estricto y en algunos navegadores necesita las comillas para
+ * interpretar el nombre completo como una sola familia.
  */
 function getResolvedFontFamily() {
   const selected = window.CONFIG.fonts.find((f) => f.id === els.fontFamilySelect.value);
   if (!selected) return window.CONFIG.fonts[0].family;
   if (selected.id === "custom") {
-    const custom = els.customFontInput.value.trim();
-    return custom.length > 0 ? `${custom}, monospace` : "monospace";
+    const custom = els.customFontInput.value.trim().replace(/["']/g, "");
+    return custom.length > 0 ? `"${custom}", monospace` : "monospace";
   }
   return selected.family;
+}
+
+/**
+ * Las fuentes del selector (Cascadia Code, Fira Code, JetBrains Mono,
+ * Source Code Pro...) solo se van a ver distintas entre sí si esa fuente
+ * está REALMENTE instalada en el equipo donde se abre el panel — no vienen
+ * incluidas en el add-in, se resuelven vía CSS font-family contra las
+ * fuentes del sistema. Si no está instalada, el navegador cae silenciosamente
+ * al siguiente nombre de la lista (normalmente "Consolas" o "monospace"), lo
+ * que puede parecer que "elegir la fuente no hace nada". Usamos
+ * document.fonts.check() para avisar cuando eso está pasando.
+ */
+function updateFontAvailabilityHint(fontFamily) {
+  const primary = fontFamily.split(",")[0].trim().replace(/^["']|["']$/g, "");
+  let available = true;
+  try {
+    if (document.fonts && document.fonts.check) {
+      available = document.fonts.check(`16px "${primary}"`);
+    }
+  } catch (e) {
+    available = true; // si el chequeo del navegador falla, no mostramos una advertencia falsa
+  }
+  if (!available) {
+    els.fontAvailabilityHint.textContent =
+      `"${primary}" no parece estar instalada en este equipo — se va a usar una fuente alternativa. ` +
+      `Instalala en Windows, o elegí "Personalizada" con una fuente que ya tengas.`;
+    els.fontAvailabilityHint.hidden = false;
+  } else {
+    els.fontAvailabilityHint.hidden = true;
+  }
 }
 
 /**
@@ -121,8 +161,10 @@ function updateHostUI() {
   const isWord = currentHost === Office.HostType.Word;
   const isPpt = currentHost === Office.HostType.PowerPoint;
 
+  els.insertAsImageSection.hidden = !isWord;
+
   if (isWord) {
-    els.hostLabel.textContent = "Word detectado — inserción como contenido nativo editable";
+    els.hostLabel.textContent = "Word detectado — inserción como contenido nativo editable (o como imagen, si lo activás abajo)";
     els.backgroundHint.textContent =
       "Envuelve el código en una tabla con fondo oscuro, borde y padding (formato nativo de Word).";
   } else if (isPpt) {
@@ -154,6 +196,8 @@ function attachEventListeners() {
   });
   els.customFontInput.addEventListener("input", renderPreview);
   els.themeSelect.addEventListener("change", renderPreview);
+  els.imageWidthInput.addEventListener("input", renderPreview);
+  els.insertAsImageToggle.addEventListener("change", renderPreview);
 
   els.insertButton.addEventListener("click", handleInsert);
 }
@@ -167,6 +211,9 @@ function getCurrentOptions() {
     fontSize: parseInt(els.fontSizeInput.value, 10) || window.CONFIG.fontSize,
     fontFamily: getResolvedFontFamily(),
     themeId: els.themeSelect.value || window.CONFIG.defaultThemeId,
+    imageWidth: parseInt(els.imageWidthInput.value, 10) || window.CONFIG.imageWidth.default,
+    // Solo tiene efecto en Word (en PowerPoint siempre se inserta como imagen).
+    insertAsImage: els.insertAsImageToggle.checked,
   };
 }
 
@@ -214,6 +261,16 @@ function renderPreview() {
   els.previewTitle.style.background = theme.title.backgroundColor;
   els.previewTitle.style.color = theme.title.textColor;
 
+  // Cuando el resultado final va a ser una imagen (siempre en PowerPoint, o
+  // en Word si se activó "Insertar como imagen"), mostramos el ancho elegido
+  // como referencia visual en la vista previa (con scroll horizontal si el
+  // código no entra, ya que acá no aplicamos el wrap real — eso sucede en
+  // Renderer.renderPptImage al insertar).
+  const willBeImage = currentHost === Office.HostType.PowerPoint || opts.insertAsImage;
+  els.previewWrapper.style.maxWidth = willBeImage ? `${opts.imageWidth}px` : "";
+
+  updateFontAvailabilityHint(opts.fontFamily);
+
   const colors = window.Highlighter.resolveColors(opts.themeId, opts.lang);
   const html = window.Highlighter.highlightToHtml(
     opts.code || "// Escribe código para ver el resaltado…",
@@ -257,6 +314,12 @@ async function handleInsert() {
 }
 
 function insertIntoWord(opts) {
+  if (opts.insertAsImage) {
+    // Reutilizamos el mismo renderer de imagen que usa PowerPoint: es
+    // agnóstico de la app anfitriona, solo dibuja un canvas y devuelve un
+    // PNG en base64.
+    return insertImageViaCommonApi(window.Renderer.renderPptImage(opts));
+  }
   const html = window.Renderer.renderWordHtml(opts);
   return new Promise((resolve, reject) => {
     Office.context.document.setSelectedDataAsync(html, { coercionType: Office.CoercionType.Html }, (result) => {
@@ -269,8 +332,12 @@ function insertIntoWord(opts) {
   });
 }
 
-function insertIntoPowerPoint(opts) {
-  const dataUrl = window.Renderer.renderPptImage(opts);
+// Prefijo usado para "marcar" (nombrar) las formas de imagen que este
+// add-in insertó en PowerPoint, para poder reconocerlas más tarde y
+// reemplazarlas en el mismo lugar en vez de apilar imágenes nuevas.
+const SNIPPET_SHAPE_NAME_PREFIX = "CodeSnippetAddin_";
+
+function insertImageViaCommonApi(dataUrl) {
   const base64 = dataUrl.split(",")[1]; // quitar el prefijo "data:image/png;base64,"
   return new Promise((resolve, reject) => {
     Office.context.document.setSelectedDataAsync(base64, { coercionType: Office.CoercionType.Image }, (result) => {
@@ -281,6 +348,89 @@ function insertIntoPowerPoint(opts) {
       }
     });
   });
+}
+
+/**
+ * IMPORTANTE: Office.context.document.setSelectedDataAsync con
+ * CoercionType.Image NO reemplaza la selección en PowerPoint — es una
+ * limitación documentada de esa API común: siempre agrega una imagen nueva
+ * al final de la lista de formas de la diapositiva actual, sin importar qué
+ * esté seleccionado. Por eso, para lograr un reemplazo real usamos la API
+ * moderna de PowerPoint (PowerPoint.run, requiere PowerPointApi 1.4+,
+ * declarado en manifest.xml):
+ *
+ *   1. Si hay EXACTAMENTE una forma seleccionada y es una que este add-in
+ *      insertó antes (la reconocemos por su nombre, con el prefijo
+ *      SNIPPET_SHAPE_NAME_PREFIX), guardamos su posición/tamaño y la
+ *      borramos.
+ *   2. Insertamos la imagen nueva con setSelectedDataAsync (queda al final
+ *      de la lista de formas).
+ *   3. Si había una forma anterior, movemos/redimensionamos la imagen recién
+ *      insertada para que ocupe el mismo lugar — visualmente, un reemplazo.
+ *   4. En cualquier caso, le ponemos el nombre con el prefijo a la imagen
+ *      insertada, para que la próxima vez se la pueda reconocer y reemplazar.
+ *
+ * Si PowerPoint.run no está disponible (versión de Office muy vieja) o algo
+ * falla en estos pasos extra, no se interrumpe la inserción: simplemente se
+ * pierde el comportamiento de "reemplazo en el mismo lugar" y el snippet se
+ * agrega igual como una imagen nueva.
+ */
+async function insertIntoPowerPoint(opts) {
+  const dataUrl = window.Renderer.renderPptImage(opts);
+  const previousBounds = await getSelectedSnippetBoundsAndDelete();
+  await insertImageViaCommonApi(dataUrl);
+  if (previousBounds) {
+    await applyBoundsToLastInsertedShape(previousBounds);
+  } else {
+    await tagLastInsertedShape();
+  }
+}
+
+function getSelectedSnippetBoundsAndDelete() {
+  if (typeof PowerPoint === "undefined" || !PowerPoint.run) return Promise.resolve(null);
+  return PowerPoint.run(async (context) => {
+    const shapes = context.presentation.getSelectedShapes();
+    shapes.load("items/name,items/left,items/top,items/width,items/height");
+    await context.sync();
+    if (shapes.items.length !== 1) return null;
+    const shape = shapes.items[0];
+    if (!shape.name || shape.name.indexOf(SNIPPET_SHAPE_NAME_PREFIX) !== 0) return null;
+    const bounds = { left: shape.left, top: shape.top, width: shape.width, height: shape.height };
+    shape.delete();
+    await context.sync();
+    return bounds;
+  }).catch((e) => {
+    console.warn("No se pudo detectar/borrar el snippet seleccionado, se insertará uno nuevo:", e);
+    return null;
+  });
+}
+
+function applyBoundsToLastInsertedShape(bounds) {
+  if (typeof PowerPoint === "undefined" || !PowerPoint.run) return Promise.resolve();
+  return PowerPoint.run(async (context) => {
+    const shapes = context.presentation.getSelectedSlides().getItemAt(0).shapes;
+    shapes.load("items/name");
+    await context.sync();
+    const last = shapes.items[shapes.items.length - 1];
+    last.left = bounds.left;
+    last.top = bounds.top;
+    last.width = bounds.width;
+    last.height = bounds.height;
+    last.name = SNIPPET_SHAPE_NAME_PREFIX + Date.now();
+    await context.sync();
+  }).catch((e) => console.warn("No se pudo reposicionar la imagen insertada en el lugar de la anterior:", e));
+}
+
+function tagLastInsertedShape() {
+  if (typeof PowerPoint === "undefined" || !PowerPoint.run) return Promise.resolve();
+  return PowerPoint.run(async (context) => {
+    const shapes = context.presentation.getSelectedSlides().getItemAt(0).shapes;
+    shapes.load("items/name");
+    await context.sync();
+    const last = shapes.items[shapes.items.length - 1];
+    last.name = SNIPPET_SHAPE_NAME_PREFIX + Date.now();
+    await context.sync();
+  }).catch((e) => console.warn("No se pudo etiquetar la imagen insertada (no se podrá reemplazar más adelante):", e));
 }
 
 function setStatus(message, kind) {

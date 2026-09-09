@@ -74,6 +74,17 @@
 
       <!-- ===================== POWERPOINT ===================== -->
       <Host xsi:type="Presentation">
+        <!--
+          Requerido por PowerPoint.run() en taskpane.js, que se usa para
+          reemplazar en el mismo lugar una imagen de snippet ya insertada
+          (en vez de apilar una nueva encima) cuando está seleccionada.
+          Ver getSelectedSnippetBoundsAndDelete() / applyBoundsToLastInsertedShape().
+        -->
+        <Requirements>
+          <Sets DefaultMinVersion="1.1">
+            <Set Name="PowerPointApi" MinVersion="1.4" />
+          </Sets>
+        </Requirements>
         <DesktopFormFactor>
           <GetStarted>
             <Title resid="GetStarted.Title" />

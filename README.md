@@ -35,19 +35,32 @@ en **PowerPoint**, desde el mismo panel.
   [Uso sin conexión](#uso-sin-conexión-offline) más abajo.
 - Vista previa en vivo con el mismo resaltado que se insertará.
 - Al pulsar **Insertar**:
-  - **En Word** → inserta una tabla HTML nativa (editable como cualquier
-    tabla de Word: puedes seleccionar el texto, cambiar colores a mano,
-    copiar/pegar, etc.). El color de cada token se aplica como formato de
-    caracter real, no como imagen.
-  - **En PowerPoint** → como PowerPoint no soporta insertar texto con
-    múltiples colores por caracter vía la API de Office.js, el snippet se
-    dibuja en un `<canvas>` (con el mismo resaltado y tipografía) y se
-    inserta como imagen PNG en alta resolución. Esto da fidelidad visual
-    perfecta y consistente entre plantillas.
-- **Editar un snippet ya insertado**: selecciona el bloque insertado (la
-  tabla en Word, o la imagen en PowerPoint), ajusta el código/opciones en el
-  panel y vuelve a pulsar "Insertar": como Office.js inserta sobre la
-  selección actual, reemplaza automáticamente lo seleccionado.
+  - **En Word** → por defecto inserta una tabla HTML nativa (editable como
+    cualquier tabla de Word: podés seleccionar el texto, cambiar colores a
+    mano, copiar/pegar, etc.). El color de cada token se aplica como formato
+    de caracter real, no como imagen. Si activás **"Insertar como imagen"**
+    (checkbox junto al ancho de imagen), en cambio inserta un PNG igual que
+    PowerPoint — útil si preferís que el snippet no se pueda editar por
+    accidente, o si tu plantilla de Word no soporta bien tablas con fondo.
+  - **En PowerPoint** → siempre como imagen: como PowerPoint no soporta
+    insertar texto con múltiples colores por caracter vía la API de
+    Office.js, el snippet se dibuja en un `<canvas>` (con el mismo resaltado
+    y tipografía) y se inserta como PNG en alta resolución.
+- **Ancho de imagen configurable**: campo "Ancho imagen (px)" (920px por
+  defecto) que controla el ancho fijo del PNG generado, tanto en PowerPoint
+  como en Word con "Insertar como imagen" activo. Si el código no entra en
+  ese ancho, las líneas se ajustan automáticamente (word-wrap) en vez de
+  desbordar o encogerse.
+- **Editar/reemplazar un snippet ya insertado**:
+  - **Word (modo texto)**: seleccioná la tabla en el documento, ajustá el
+    código y volvé a pulsar "Insertar" — Office reemplaza la selección.
+  - **PowerPoint**: seleccioná la imagen que insertó este add-in y volvé a
+    pulsar "Insertar" — se borra y la nueva imagen se coloca exactamente en
+    su mismo lugar y tamaño (ver la nota técnica más abajo sobre por qué
+    esto necesita un mecanismo especial). Si seleccionás otra cosa (o nada),
+    simplemente agrega una imagen nueva.
+  - **Word (modo imagen)**: no hay reemplazo automático — cada "Insertar"
+    agrega una imagen nueva, hay que borrar la anterior a mano.
 
 ## Estructura del proyecto
 
@@ -92,6 +105,7 @@ Casi cualquier cambio visual o de comportamiento se hace en
 | El peso/tamaño de la barra de título            | `CONFIG.title` |
 | Los lenguajes disponibles en el selector        | `CONFIG.languages` (usa nombres de [Prism](https://prismjs.com/#supported-languages)) |
 | El tamaño de fuente por defecto                 | `CONFIG.fontSize` |
+| El ancho de imagen por defecto y sus límites    | `CONFIG.imageWidth` (`default`/`min`/`max`) |
 | Las palabras clave del pseudocódigo PSeInt      | `vendor/prism/prism-pseint.js` (arreglos `multiWordKeywords`, `singleWordKeywords`, `types`, `builtinFunctions`) |
 
 ### Agregar un nuevo esquema de color
@@ -237,6 +251,34 @@ a `vendor/prism/prism-pseint.js`.
   `Office.CoercionType.Image` para contenido con múltiples colores/estilos en
   una sola inserción, por eso el snippet se renderiza a un canvas y se
   inserta como PNG en las diapositivas.
+- **Por qué reemplazar una imagen en PowerPoint necesita PowerPoint.run**:
+  `Office.context.document.setSelectedDataAsync` con `CoercionType.Image` NO
+  reemplaza la selección en PowerPoint — es una limitación documentada de esa
+  API común: siempre agrega la imagen como una forma nueva al final de la
+  diapositiva actual, sin importar qué esté seleccionado (el propio ejemplo
+  oficial de Microsoft para esta API busca la imagen recién insertada como
+  `shapes.items[shapes.items.length - 1]`, confirmando que es un "agregar",
+  no un "reemplazar"). Por eso, en `taskpane.js`,
+  `getSelectedSnippetBoundsAndDelete()` usa la API moderna (`PowerPoint.run`,
+  que requiere el conjunto `PowerPointApi` 1.4+ declarado en
+  `manifest.xml`) para: detectar si hay una única forma seleccionada que este
+  add-in insertó antes (la reconoce por un nombre con el prefijo
+  `CodeSnippetAddin_`), guardar su posición/tamaño, borrarla, insertar la
+  imagen nueva, y reposicionarla/redimensionarla para que ocupe el mismo
+  lugar. Si `PowerPoint.run` no está disponible (Office muy viejo) o algo
+  falla, se sigue insertando igual, solo que como una imagen nueva en vez de
+  reemplazar.
+- **Por qué las fuentes del selector pueden no notarse**: "Fira Code",
+  "JetBrains Mono", "Cascadia Code", etc. NO vienen incluidas en el add-in —
+  se resuelven vía CSS `font-family` contra las fuentes instaladas en el
+  equipo donde se abre el panel. Si no están instaladas, el navegador cae
+  silenciosamente a la siguiente fuente de la lista (normalmente "Consolas"),
+  lo que puede dar la sensación de que "elegir la fuente no hace nada". El
+  panel ahora usa `document.fonts.check()` para avisarlo (aviso amarillo
+  debajo del selector) en vez de fallar en silencio. "Consolas" y "Courier
+  New" son las únicas opciones que vienen instaladas en Windows/Office
+  siempre; el resto hay que instalarlas aparte (o usar "Personalizada" con
+  una fuente que ya tengas).
 - **Por qué se ejecutan los hooks de Prism a mano**: el add-in tokeniza el
   código con `Prism.tokenize()` en vez de `Prism.highlightElement()`, para
   poder generar HTML propio y dibujar en canvas. El problema es que algunas
@@ -269,3 +311,13 @@ a `vendor/prism/prism-pseint.js`.
   propio, y reemplaza `https://localhost:3000` por el dominio HTTPS real
   donde alojes los archivos (Azure Static Web Apps, GitHub Pages con
   dominio propio + HTTPS, IIS, etc.).
+- **Si ya tenías el add-in publicado/sideloaded (GitHub Pages, catálogo de
+  red, etc.)**: este cambio modificó `manifest.xml` (se agregó el bloque
+  `<Requirements>` de PowerPoint) y varios archivos JS. Si usás GitHub
+  Pages, hacé commit + push de los archivos nuevos como siempre. Si usás un
+  catálogo de carpeta compartida, copiá el `manifest.xml` actualizado a esa
+  carpeta. En ambos casos, cerrá y volvé a abrir Word/PowerPoint por
+  completo para que tomen los cambios (Office cachea el manifest y a veces
+  también el JS del panel; si no ves los cambios, probá cerrando Office,
+  reabriendo, y si persiste, quitando y volviendo a agregar el complemento
+  desde "Mis complementos" / el catálogo).

@@ -106,6 +106,10 @@ input[type="number"] {
   margin: 4px 0 0 0;
 }
 
+.hint-warning {
+  color: #b45309;
+}
+
 #previewWrapper {
   border-radius: 8px;
   overflow: hidden;
